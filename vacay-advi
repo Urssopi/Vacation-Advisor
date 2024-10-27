@@ -1,0 +1,62 @@
+#Vacation assistant that reccomends vacation spots.
+from openai import OpenAI
+
+client = OpenAI(
+    api_key = "input api"
+)
+
+open_file = open("dataset.json","rb")
+
+data_flie = client.files.create(
+    file = open_file,
+    purpose = 'assistants'
+)
+
+ai_assistant = client.beta.assistants.create(
+    name = "Vacation Advisor",
+    instructions = "You are an application with special expertise in recommending "
+                   "places to go on vacation based on the information you a"
+                   "re provided with. Depending on the preferred budget, the "
+                   "time of travel, the preferred temperature, desired activities, "
+                   "and how far they want to travel, you are required to name a place "
+                   "in the world that fits the description of the users desire. You are "
+                   "also required to give the temperature at the time of the user's planned "
+                   "travel in fahrenheit, popular activities in the area, the estimated price"
+                   " range, and distance to the place. You also should be able take in any user data",
+    model = "gpt-3.5-turbo",
+    tools = [{"type": "file_search"}]
+)
+
+prompt = input("Enter a Prompt: ")
+thread = client.beta.threads.create(
+    messages=[
+        {
+            "role":"user",
+            "content":prompt,
+            "attachments":[
+                {"file_id": data_flie.id, "tools": [{"type": "file_search"}]}
+            ]
+        }
+    ]
+)
+print("\n################################################")
+print("Thread id: "+ thread.id)
+print("Assistant id: " + ai_assistant.id)
+print("#################################################\n")
+
+run = client.beta.threads.runs.create_and_poll(
+    thread_id=thread.id,
+    assistant_id=ai_assistant.id
+)
+
+if run.status == 'completed':
+    messages = client.beta.threads.messages.list(
+        thread_id=thread.id
+    )
+    print("User: " + messages.data[1].content[0].text.value)
+    print("Assistant: "+ messages.data[0].content[0].text.value)
+
+    print("\n############################################")
+    print("Run id: "+ run.id)
+else:
+    print(run.status)
